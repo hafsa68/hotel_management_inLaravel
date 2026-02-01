@@ -9,14 +9,18 @@
     <div class="layout-wrapper">
 
         <!-- ========== Left Sidebar ========== -->
-         @if(Auth::guard('web')->check())
-       @include("backend.layouts.leftbar")
-        @elseif(Auth::guard('admin')->check())
-         @include("backend.layouts.adminLeftbar")
-        @elseif(Auth::guard('manager')->check())
-         @include("backend.layouts.managerLeftbar")
-        @endif
+       
 
+
+         @auth
+                @if(auth()->user()->role == 'admin')
+                    @include('backend.layouts.adminLeftbar')
+                @elseif(auth()->user()->role == 'manager')
+                    @include('backend.layouts.managerLeftbar')
+                @else
+                    @include('backend.layouts.leftbar')
+                @endif
+            @endauth
         <!-- ============================================================== -->
         <!-- Start Page Content here -->
         <!-- ============================================================== -->

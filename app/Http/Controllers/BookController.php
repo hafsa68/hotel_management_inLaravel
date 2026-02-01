@@ -15,6 +15,8 @@ class BookController extends Controller
         return view('backend.book.index', compact('roomTypes'));
     }
 
+  
+  
     public function search(Request $request) 
     {
         $roomId = $request->rooms_id; 
@@ -36,8 +38,7 @@ class BookController extends Controller
         $roomTypes = Room::all();
         $selectedRoomType = Room::find($roomId);
 
-        // 2. CRITICAL FIX: Changed 'rooms_id' to 'room_id'
-        // This matches the column name in your database, fixing the SQL error.
+        // 2. Get all rooms of this type
         $allRoomNumbers = RoomNo::where('room_id', $roomId)->get();
 
         // 3. Find Booked Rooms using Booking Model
@@ -50,18 +51,47 @@ class BookController extends Controller
                   });
         })->pluck('room_nos_id')->toArray();
 
-        return view('backend.book.index', compact('allRoomNumbers', 'bookedRoomIds', 'checkIn', 'checkOut', 'roomTypes', 'selectedRoomType'));
+        // ✅ লজিক: একসাথে সব ডাটা
+        $roomData = [
+            'total' => $allRoomNumbers->count(),
+            'available' => 0,
+            'booked' => 0,
+            'available_rooms' => [],
+            'booked_rooms' => []
+        ];
+        
+        foreach($allRoomNumbers as $room) {
+            if(in_array($room->id, $bookedRoomIds)) {
+                $roomData['booked']++;
+                $roomData['booked_rooms'][] = $room;
+            } else {
+                $roomData['available']++;
+                $roomData['available_rooms'][] = $room;
+            }
+        }
+
+        return view('backend.book.index', compact(
+            'allRoomNumbers', 
+            'bookedRoomIds', 
+            'checkIn', 
+            'checkOut', 
+            'roomTypes', 
+            'selectedRoomType',
+            'roomData' // ✅ সব ডাটা একসাথে
+        ));
     }
+
+    public function getRoomCount($id)
+    {
+        $count = RoomNo::where('room_id', $id)->count();
+        return response()->json(['count' => $count]);
+    }
+
 
     // The store method is removed because we moved it to BookingController
     // to keep logic clean (Search vs Storage).
 
-    public function getRoomCount($id)
-    {
-        // 4. CRITICAL FIX: Changed 'rooms_id' to 'room_id' here too
-        $count = RoomNo::where('room_id', $id)->count();
-        return response()->json(['count' => $count]);
-    }
+   
 
     
 }

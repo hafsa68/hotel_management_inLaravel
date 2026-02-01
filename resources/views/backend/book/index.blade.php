@@ -128,29 +128,60 @@
                     <hr class="my-4">
                     <div class="row">
                         {{-- LEFT SIDE: GRID SELECTION --}}
-                        <div class="col-md-8">
-                            <h5 class="mb-3 border-bottom pb-2">Select a Room <small
-                                    class="text-muted">({{ $selectedRoomType->name }})</small></h5>
-                            @if ($allRoomNumbers->isEmpty())
-                                <div class="alert alert-warning">No physical rooms found for this category.</div>
-                            @else
-                                <div class="d-flex flex-wrap">
-                                    @foreach ($allRoomNumbers as $room)
-                                        @php $isBooked = in_array($room->id, $bookedRoomIds); @endphp
-                                        <div class="room-selector m-2 p-3 text-center rounded shadow-sm border {{ $isBooked ? 'bg-danger text-white disabled-room' : 'bg-light text-dark' }}"
-                                            style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; font-weight: bold; position: relative;"
-                                            data-id="{{ $room->id }}"
-                                            data-no="{{ $room->room_number ?? $room->room_no }}">
-                                            {{ $room->room_number ?? $room->room_no }}
-                                            <div
-                                                style="font-size: 10px; position: absolute; bottom: 5px; color: {{ $isBooked ? 'white' : '#28a745' }};">
-                                                {{ $isBooked ? 'BOOKED' : 'FREE' }}
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @endif
+                       {{-- LEFT SIDE: GRID SELECTION --}}
+<div class="col-md-8">
+    <h5 class="mb-3 border-bottom pb-2">
+        Select a Room 
+        <small class="text-muted">({{ $selectedRoomType->name }})</small>
+        <span class="badge badge-success ml-2">Available: {{ $roomData['available'] }}</span>
+        <span class="badge badge-danger ml-2">Booked: {{ $roomData['booked'] }}</span>
+        <span class="badge badge-info ml-2">Total: {{ $roomData['total'] }}</span>
+    </h5>
+    
+    @if($roomData['available'] == 0)
+        <div class="alert alert-danger">
+            <i class="fa fa-exclamation-triangle"></i> 
+            No rooms available for selected dates!
+            All {{ $roomData['booked'] }} rooms are booked.
+        </div>
+    @endif
+    
+    <div class="d-flex flex-wrap">
+        {{-- শুধু available রুমগুলো দেখানো --}}
+        @foreach ($roomData['available_rooms'] as $room)
+            <div class="room-selector m-2 p-3 text-center rounded shadow-sm border bg-light text-dark"
+                 style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; font-weight: bold; position: relative;"
+                 data-id="{{ $room->id }}"
+                 data-no="{{ $room->room_number ?? $room->room_no }}">
+                {{ $room->room_number ?? $room->room_no }}
+                <div style="font-size: 10px; position: absolute; bottom: 5px; color: #28a745;">
+                    AVAILABLE
+                </div>
+            </div>
+        @endforeach
+        
+        {{-- Optional: Booked রুমগুলো দেখানো (যদি চান) --}}
+        @if(count($roomData['booked_rooms']) > 0)
+            <div class="w-100 mt-4">
+                <h6 class="text-danger"><i class="fa fa-lock"></i> Already Booked Rooms:</h6>
+                <div class="d-flex flex-wrap">
+                    @foreach ($roomData['booked_rooms'] as $room)
+                        <div class="m-2 p-3 text-center rounded bg-danger text-white disabled-room"
+                             style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; font-weight: bold; position: relative; opacity: 0.7; cursor: not-allowed;">
+                            {{ $room->room_number ?? $room->room_no }}
+                            <div style="font-size: 10px; position: absolute; bottom: 5px; color: white;">
+                                BOOKED
+                            </div>
+                            <div style="position: absolute; top: 5px; right: 5px;">
+                                <i class="fa fa-lock text-white"></i>
+                            </div>
                         </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+    </div>
+</div>
 
                         {{-- RIGHT SIDE: GUEST FORM --}}
                         <div class="col-md-4">
@@ -171,25 +202,34 @@
                                         </div>
 
                                         {{-- NEW FIELD: DROPDOWN SELECTION --}}
-                                        <div class="form-group">
-                                            <label class="font-weight-bold text-primary">Selected Room Number <span
-                                                    class="text-danger">*</span></label>
-                                            <select class="form-control font-weight-bold" id="manual_room_select">
-                                                <option value="">-- Choose from List --</option>
-                                                @foreach ($allRoomNumbers as $room)
-                                                    @php $isBooked = in_array($room->id, $bookedRoomIds); @endphp
-                                                    {{-- Only show Available rooms in dropdown --}}
-                                                    @if (!$isBooked)
-                                                        <option value="{{ $room->id }}">
-                                                            {{ $room->room_number ?? $room->room_no }}</option>
-                                                    @endif
-                                                @endforeach
-                                            </select>
-                                            <small class="text-muted">You can click the boxes on the left OR select
-                                                here.</small>
-                                            <small class="text-danger" id="room_error"
-                                                style="display:none; display:block;">Please select a room!</small>
-                                        </div>
+                                        {{-- DROPDOWN SELECTION --}}
+<div class="form-group">
+    <label class="font-weight-bold text-primary">Select Room Number <span class="text-danger">*</span></label>
+    
+    @if($roomData['available'] == 0)
+        <select class="form-control font-weight-bold" id="manual_room_select" disabled>
+            <option value="">No rooms available</option>
+        </select>
+        <small class="text-danger">All rooms are booked. Please select different dates or room type.</small>
+    @else
+        <select class="form-control font-weight-bold" id="manual_room_select">
+            <option value="">-- Choose from Available Rooms ({{ $roomData['available'] }}) --</option>
+            @foreach ($roomData['available_rooms'] as $room)
+                <option value="{{ $room->id }}">
+                    {{ $room->room_number ?? $room->room_no }} - Available
+                </option>
+            @endforeach
+        </select>
+        <small class="text-muted">
+            Showing only available rooms. 
+            @if($roomData['booked'] > 0)
+                <span class="text-danger">{{ $roomData['booked'] }} rooms are already booked.</span>
+            @endif
+        </small>
+    @endif
+    
+    <small class="text-danger" id="room_error" style="display:none;">Please select a room!</small>
+</div>
 
                                         <hr>
 
@@ -201,7 +241,7 @@
                                         <div class="form-group">
                                             <label>Email / Phone</label>
                                             <input type="text" name="guest_email" class="form-control"
-                                                placeholder="Optional">
+                                                placeholder="Enter Email Address">
                                         </div>
                                         <button type="submit" class="btn btn-success btn-block btn-lg shadow-sm mt-4"
                                             onclick="return validateRoomSelection()">Confirm Booking</button>
@@ -314,6 +354,47 @@
                 }
                 return true;
             }
+
+             $('.room-selector').click(function() {
+        // Highlight Box
+        $('.room-selector').removeClass('selected-room').addClass('bg-light text-dark');
+        $(this).removeClass('bg-light text-dark').addClass('selected-room');
+
+        // Update Hidden ID
+        let id = $(this).data('id');
+        $('#room_nos_id').val(id);
+        $('#room_error').hide();
+
+        // Update Dropdown to match Box
+        $('#manual_room_select').val(id);
+    });
+
+    // Prevent clicking on booked rooms (যদি দেখান)
+    $('.disabled-room').click(function() {
+        alert('This room is already booked for the selected dates!');
+        return false;
+    });
+
+    // Dropdown change
+    $('#manual_room_select').on('change', function() {
+        let id = $(this).val();
+
+        // Update Hidden ID
+        $('#room_nos_id').val(id);
+
+        if (id) {
+            $('#room_error').hide();
+            // Highlight the corresponding box
+            $('.room-selector').removeClass('selected-room').addClass('bg-light text-dark');
+            let targetBox = $('.room-selector[data-id="' + id + '"]');
+            if(targetBox.length) {
+                targetBox.removeClass('bg-light text-dark').addClass('selected-room');
+            }
+        } else {
+            // Clear highlight
+            $('.room-selector').removeClass('selected-room').addClass('bg-light text-dark');
+        }
+    });
         </script>
     @endsection
 </div>

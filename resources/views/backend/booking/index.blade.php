@@ -1,226 +1,240 @@
 @extends("backend.layouts.app")
-@section("head")
 
+@section('head')
 <head>
     <meta charset="utf-8" />
-    <title>All Booking Request | Admin Panel</title>
+    <title>Dashboard | Dashtrap - Responsive Bootstrap 5 Admin Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta content="A fully featured admin theme which can be used to build CRM, CMS, etc." name="description" />
     <meta content="Myra Studio" name="author" />
-    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- App favicon -->
-    <link rel="shortcut icon" href="{{url('')}}/assets/images/favicon.ico">
+    <link rel="shortcut icon" href="assets/images/favicon.ico">
+
+    <link href="assets/libs/morris.js/morris.css" rel="stylesheet" type="text/css" />
 
     <!-- App css -->
-    <link href="{{url('')}}/assets/css/style.min.css" rel="stylesheet" type="text/css">
-    <link href="{{url('')}}/assets/css/icons.min.css" rel="stylesheet" type="text/css">
-    <script src="{{url('')}}/assets/js/config.js"></script>
-
+    <link href="assets/css/style.min.css" rel="stylesheet" type="text/css">
+    <link href="assets/css/icons.min.css" rel="stylesheet" type="text/css">
+    <script src="assets/js/config.js"></script>
 </head>
 @endsection
-@section("content")
 
+@section('content')
 <div class="container-fluid">
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0 font-weight-bold text-primary">
+                <i class="fa fa-list mr-2"></i> All Bookings
+            </h4>
+            <div>
+                <a href="#" class="btn btn-primary btn-sm">
+                    <i class="fa fa-plus"></i> New Booking
+                </a>
+                @if(request()->hasAny(['search', 'status', 'date_from', 'date_to']))
+                <a href="{{ route('booking.index') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fa fa-times"></i> Clear Filters
+                </a>
+                @endif
+            </div>
+        </div>
 
-
-    <!-- start page title -->
-    <div class="page-content">
-
-
-        <!-- ========== Topbar End ========== -->
-
-        <div class="px-3">
-
-            <!-- Start Content-->
-            <div class="container-fluid">
-
-                <!-- start page title -->
-                <div class="py-3 py-lg-4">
-                    <div class="row">
-                        <div class="col-lg-12">
-                            @if(session('success'))
-                            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                                <i class="fas fa-check-circle me-2"></i>
-                                {{session('success')}}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                            @endif
-
+        <div class="card-body">
+            {{-- Search and Filter Form --}}
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <form method="GET" action="{{ route('booking.index') }}" class="form-inline">
+                        {{-- Search Box --}}
+                        <div class="form-group mr-3 mb-2">
+                            <input type="text" name="search" class="form-control form-control-sm"
+                                placeholder="Search by name, email, phone or ID"
+                                value="{{ request('search') }}">
                         </div>
 
-                    </div>
+                        {{-- Status Filter --}}
+                        <div class="form-group mr-3 mb-2">
+                            <select name="status" class="form-control form-control-sm">
+                                <option value="">All Status</option>
+                                <option value="booked" {{ request('status') == 'booked' ? 'selected' : '' }}>Booked</option>
+                                <option value="confirmed" {{ request('status') == 'confirmed' ? 'selected' : '' }}>Confirmed</option>
+                                <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
+                                <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                                <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Completed</option>
+                            </select>
+                        </div>
+
+                        {{-- Date From --}}
+                        <div class="form-group mr-3 mb-2">
+                            <input type="date" name="date_from" class="form-control form-control-sm"
+                                value="{{ request('date_from') }}" placeholder="From Date">
+                        </div>
+
+                        {{-- Date To --}}
+                        <div class="form-group mr-3 mb-2">
+                            <input type="date" name="date_to" class="form-control form-control-sm"
+                                value="{{ request('date_to') }}" placeholder="To Date">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-sm mb-2">
+                            <i class="fa fa-search"></i> Filter
+                        </button>
+                    </form>
                 </div>
-                <!-- end page title -->
+            </div>
 
-
-                <!--- end row -->
-
-
-                <div class="row">
-                    <div class="col-lg-12">
-                        <div class="card">
-                            <div class="card shadow-sm">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0">
-                                        <i class="fas fa-list me-2"></i> All Booking Request
-                                    </h5>
-                                    <a href="{{ route('booking.create') }}" class="btn btn-primary btn-sm">
-                                        <i class="fas fa-plus me-1"></i> Add New
+            {{-- Bookings Table --}}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>#ID</th>
+                            <th>Guest</th>
+                            <th>Contact</th>
+                            <th>Room</th>
+                            <th>Check-in</th>
+                            <th>Check-out</th>
+                            <th>Nights</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Booked On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{-- ✅ এখানে পরিবর্তন: $booking as $booking → $booking as $item --}}
+                        @forelse($booking as $item)
+                        <tr>
+                            <td>{{ $item->id }}</td>
+                            <td>
+                                <strong>{{ $item->guest_name }}</strong>
+                            </td>
+                            <td>
+                                @if($item->guest_email)
+                                <div>{{ $item->guest_email }}</div>
+                                @endif
+                                @if($item->phone)
+                                <div class="text-muted">{{ $item->phone }}</div>
+                                @endif
+                            </td>
+                            <td>
+                                <div><strong>{{ $item->room->room_number ?? 'N/A' }}</strong></div>
+                                <small class="text-muted">{{ $item->roomType->name ?? 'N/A' }}</small>
+                            </td>
+                            <td>{{ date('d M, Y', strtotime($item->check_in)) }}</td>
+                            <td>{{ date('d M, Y', strtotime($item->check_out)) }}</td>
+                            <td class="text-center">{{ $item->nights }}</td>
+                            <td class="text-right">৳{{ number_format($item->total_price, 2) }}</td>
+                            <td>
+    @php
+        $statusConfig = [
+            'booked' => ['bg-success', 'Booked'],
+            'confirmed' => ['bg-primary', 'Confirmed'],
+            'pending' => ['bg-warning text-dark', 'Pending'],
+            'cancelled' => ['bg-danger', 'Cancelled'],
+            'completed' => ['bg-info', 'Completed']
+        ];
+        
+        $config = $statusConfig[$item->status] ?? ['bg-secondary', 'Unknown'];
+        $class = $config[0];
+        $text = $config[1];
+    @endphp
+    
+    <span class="badge {{ $class }}" style="
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-weight: 500;
+        font-size: 13px;
+        opacity: 1;
+        visibility: visible;
+        display: inline-block;">
+        {{ $text }}
+    </span>
+</td>
+                            <td>{{ $item->created_at->format('d M, Y') }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ route('booking.success', $item->id) }}"
+                                        class="btn btn-info btn-sm" title="View Details">
+                                        <i class="fa fa-eye"></i>
                                     </a>
+                                    <button type="button" class="btn btn-warning btn-sm"
+                                        onclick="editBooking({{ $item->id }})" title="Edit">
+                                        <i class="fa fa-edit"></i>
+                                    </button>
+                                    <form action="{{ route('booking.destroy', $item->id) }}"
+                                        method="POST" style="display: inline;">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-danger btn-sm"
+                                            onclick="return confirm('Delete this booking?')" title="Delete">
+                                            <i class="fa fa-trash"></i>
+                                        </button>
+                                    </form>
                                 </div>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="11" class="text-center text-muted py-4">
+                                <i class="fa fa-info-circle fa-2x mb-2"></i><br>
+                                No bookings found.
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
 
-                                <div class="card-body p-0">
-                                    @if($data->isEmpty())
-                                    <div class="text-center py-5">
-                                        <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
-                                        <p class="text-muted">No Booking Request found.</p>
-                                        <a href="{{ route('booking.create') }}" class="btn btn-primary">
-                                            <i class="fas fa-plus me-1"></i> Add First Booking
-                                        </a>
-                                    </div>
-                                    @else
-                                    <div class="table-responsive">
-                                        <table class="table table-striped align-middle mb-0">
-                                            <thead class="table-primary">
-                                                <tr>
-                                                    <th width="50">SL</th>
-                                                    <th>Icon</th>
-                                                    <th>Title</th>
-                                                    <th class="text-center" width="90">Status</th>
-                                                    <th class="text-center" width="300">Action</th>
-                                                </tr>
-                                            </thead>
-
-                                            <tbody>
-
-                                                @foreach($data as $item)
-                                                <tr>
-                                                    <td>{{$item->id }}</td>
-                                                    <td>
-                                                        @if($item->icon)
-                                                        <i class="fas {{ $item->icon }} fa-lg text-primary"></i>
-                                                        @else
-                                                        <i class="fas fa-question-circle fa-lg text-secondary"></i>
-                                                        @endif
-                                                    </td>
-                                                    <td>{{ $item->title }}</td>
-                                                    <td class="text-center">
-                                                        @if($item->status == 'Enabled')
-                                                        <span class="badge bg-success">
-                                                            <i class="fas fa-check-circle me-1"></i> Enabled
-                                                        </span>
-                                                        @else
-                                                        <span class="badge bg-danger">
-                                                            <i class="fas fa-times-circle me-1"></i> Disabled
-                                                        </span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="text-center">
-
-                                                        <a href="{{ route('booking.edit', $item->id) }}"
-                                                            class="btn btn-sm btn-outline-primary">
-                                                            <i class="fas fa-edit"></i> Edit
-                                                        </a>
-
-
-                                                        <button
-                                                            type="button"
-                                                            class="btn btn-sm toggle-status 
-                                                                {{ $item->status == 'Enabled' ? 'btn-outline-warning' : 'btn-outline-success' }}"
-                                                            data-id="{{ $item->id }}"
-                                                            data-status="{{ $item->status }}">
-                                                            @if($item->status == 'Enabled')
-                                                            <i class="fas fa-toggle-off me-1"></i> Disable
-                                                            @else
-                                                            <i class="fas fa-toggle-on me-1"></i> Enable
-                                                            @endif
-                                                        </button>
-
-                                                        <!-- <button type="submit" class="btn btn-sm 
-                                                                {{ $item->status == 'Enabled' ? 'btn-outline-warning' : 'btn-outline-success' }}">
-                                                            @if($item->status == 'Enabled')
-                                                            <i class="fas fa-toggle-off me-1"></i> Disable
-                                                            @else
-                                                            <i class="fas fa-toggle-on me-1"></i> Enable
-                                                            @endif
-                                                        </button> -->
-
-
-
-
-                                                    </td>
-                                                </tr>
-                                                @endforeach
-
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    @endif
-                                </div>
-                            </div>
-
-                        </div> <!-- end card -->
-                    </div> <!-- end col -->
-                </div>
-                <!-- end row -->
-
-            </div> <!-- container -->
-
-        </div> <!-- content -->
-
+            {{-- Pagination --}}
+            <div class="d-flex justify-content-center mt-4">
+                {{ $booking->appends(request()->query())->links() }}
+            </div>
+        </div>
     </div>
-    <!--end row-->
-
 </div>
 
+{{-- Edit Booking Modal (Optional) --}}
+<div class="modal fade" id="editBookingModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Booking</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <form id="editBookingForm" method="POST">
+                @csrf
+                @method('PUT')
+                <div class="modal-body" id="editBookingContent">
+                    <!-- AJAX content will load here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Update Booking</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
-@section("scripts")
+@section('scripts')
 <script src="{{url('')}}/assets/js/vendor.min.js"></script>
 <script src="{{url('')}}/assets/js/app.js"></script>
 <script>
-    $(document).on('click', '.toggle-status', function() {
-
-        let button = $(this);
-        let id = button.data('id');
-
+    function editBooking(id) {
+        // AJAX request to get booking data
         $.ajax({
-            url: "{{ route('booking.status.toggle') }}",
-            type: "POST",
-            data: {
-                _token: $('meta[name="csrf-token"]').attr('content'),
-                id: id
-            },
+            url: '/booking/' + id + '/edit',
+            type: 'GET',
             success: function(response) {
-
-                if (response.status === 'Enabled') {
-                    button
-                        .removeClass('btn-outline-success')
-                        .addClass('btn-outline-warning')
-                        .html('<i class="fas fa-toggle-off me-1"></i> Disable');
-
-                    button.closest('tr').find('.badge')
-                        .removeClass('bg-danger')
-                        .addClass('bg-success')
-                        .html('<i class="fas fa-check-circle me-1"></i> Enabled');
-
-                } else {
-                    button
-                        .removeClass('btn-outline-warning')
-                        .addClass('btn-outline-success')
-                        .html('<i class="fas fa-toggle-on me-1"></i> Enable');
-
-                    button.closest('tr').find('.badge')
-                        .removeClass('bg-success')
-                        .addClass('bg-danger')
-                        .html('<i class="fas fa-times-circle me-1"></i> Disabled');
-                }
+                $('#editBookingContent').html(response);
+                $('#editBookingForm').attr('action', '/booking/' + id);
+                $('#editBookingModal').modal('show');
+            },
+            error: function() {
+                alert('Error loading booking data');
             }
         });
-    });
+    }
 </script>
-
-
-
 @endsection

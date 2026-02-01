@@ -7,12 +7,15 @@ use App\Http\Controllers\BookController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\FacilitieController;
+use App\Http\Controllers\FrontendController;
 use App\Http\Controllers\ManagerController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RequestController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\RoomNoController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -98,4 +101,60 @@ Route::get('/admin/get-room-count/{id}', [BookController::class, 'getRoomCount']
 Route::get('/admin/dashboard', [AdminController::class, 'Admindashboard'])->name('admin.dashboard');
 Route::get('/manager/dashboard', [ManagerController::class, 'ManagerDashboard'])->name('manager.dashboard');
 
+
+//booking controller er route
+Route::post('/booking', [BookingController::class, 'store'])->name('booking.store');
+Route::get('/booking-success/{id}', [BookingController::class, 'success'])->name('booking.success');
+Route::get('/booking', [BookingController::class, 'index'])->name('booking.index');
+// routes/web.php
+Route::resource('booking', BookingController::class)->except(['create', 'store']);
+// create এবং store ইতিমধ্যে আছে
+
+
+
+
+// User Dashboard রাউট
+Route::get('/user/dashboard', [UserController::class, 'dashboard'])->name('user.dashboard');
+Route::get('/my-bookings', [UserController::class, 'myBookings'])->name('user.bookings');
+// ... ইত্যাদি
 require __DIR__ . '/auth.php';
+
+Route::get('/', [FrontendController::class, 'index'])->name('home');
+Route::get('/rooms', [FrontendController::class, 'rooms'])->name('frontend.rooms');
+Route::get('/room/{id}', [FrontendController::class, 'roomDetails'])->name('frontend.room.details');
+Route::get('/about', [FrontendController::class, 'about'])->name('frontend.about');
+Route::get('/contact', [FrontendController::class, 'contact'])->name('frontend.contact');
+Route::get('/check-availability', [FrontendController::class, 'checkAvailability'])->name('frontend.check.availability'); // এই লাইন
+
+// User routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/user/dashboard', [UserController::class, 'dashboard'])->name('user.dashboard');
+
+});
+
+
+// Payment রাউটগুলো
+// routes/web.php
+Route::prefix('payment')->group(function () {
+    // বুকিং ফর্ম
+    Route::get('/book', [PaymentController::class, 'bookForm'])->name('payment.book.form');
+    
+    // বুকিং প্রসেস
+    Route::post('/process', [PaymentController::class, 'processBooking'])->name('payment.process');
+    
+    // SSL Commerz কলব্যাক
+    Route::post('/ssl/success', [PaymentController::class, 'sslSuccess'])->name('payment.ssl.success');
+    Route::post('/ssl/fail', [PaymentController::class, 'sslFail'])->name('payment.ssl.fail');
+    Route::post('/ssl/cancel', [PaymentController::class, 'sslCancel'])->name('payment.ssl.cancel');
+    Route::post('/ssl/ipn', [PaymentController::class, 'sslIPN'])->name('payment.ssl.ipn');
+    
+    // স্ট্যাটাস পেজ
+    Route::get('/success/{id}', [PaymentController::class, 'success'])->name('payment.success');
+    Route::get('/fail', [PaymentController::class, 'fail'])->name('payment.fail');
+    Route::get('/cancel', [PaymentController::class, 'cancel'])->name('payment.cancel');
+    Route::get('/bank/{id}', [PaymentController::class, 'bankTransfer'])->name('payment.bank');
+});
+
+// routes/web.php
+Route::post('/payment/upload-receipt', [PaymentController::class, 'uploadReceipt'])->name('payment.upload.receipt');
+Route::get('/payment/retry/{id}', [PaymentController::class, 'retryPayment'])->name('payment.retry');

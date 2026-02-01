@@ -28,7 +28,7 @@ class RoomController extends Controller
         'fare' => 'required|numeric',
         'total_adult' => 'required|integer', // 'adults' এর পরিবর্তে 'total_adult'
         'total_child' => 'required|integer', // 'children' এর পরিবর্তে 'total_child'
-        'main_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+        'main_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
     ]);
 
     $data = $request->all();
@@ -79,8 +79,8 @@ class RoomController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'fare' => 'required|numeric',
-            'adults' => 'required|integer',
-            'children' => 'required|integer',
+            'total_adult' => 'required|integer',
+            'total_child' => 'required|integer',
             'room_type' => 'required',
             'status' => 'required',
         ]);
