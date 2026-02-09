@@ -62,42 +62,47 @@
         @forelse($roomTypes as $room)
         <div class="col-md-4 mb-4">
             <div class="card h-100 shadow-sm">
-                @if($room->image)
-                <img src="{{ asset('storage/' . $room->image) }}" class="card-img-top" alt="{{ $room->name }}" style="height: 200px; object-fit: cover;">
-                @else
-                <img src="https://via.placeholder.com/400x200?text=No+Image" class="card-img-top" alt="No Image">
-                @endif
+                <img
+                    src="{{ asset($room->main_image) }}"
+                    class="card-img-top"
+                    style="height:200px; object-fit:cover;">
+
+
 
                 <div class="card-body">
                     <h5 class="card-title text-primary">{{ $room->name }}</h5>
                     <p class="card-text">
                         <i class="fas fa-user-friends"></i>
-                        <strong>Capacity:</strong> {{ $room->capacity_adults ?? 2 }} Adults
-                        @if(isset($room->capacity_children) && $room->capacity_children > 0)
-                        + {{ $room->capacity_children }} Children
+                        <strong>Capacity:</strong> {{ $room->total_adult ?? 2 }} Adults
+                        @if(isset($room->total_child) && $room->total_child > 0)
+                        + {{ $room->total_child }} Children
                         @endif
+
                     </p>
                     <p class="card-text">
                         <i class="fas fa-bed"></i>
-                        <strong>Type:</strong> {{ $room->type ?? 'Standard' }}
+                        <strong>Type:</strong> {{ $room->room_type ?? 'Standard' }}
                     </p>
                     <p class="card-text">
                         <i class="fas fa-box-open"></i>
-                        <strong>Available:</strong>
-                        <span class="badge bg-success">
-                            {{ $room->total_rooms ?? 5 }} Rooms
-                        </span>
+                        <strong>Available Rooms:</strong>
+                        {{ $room->roomNumbers->count() }}
+                    </p>
+
                     </p>
                     <p class="card-text">
                         <i class="fas fa-tag"></i>
                         <strong>Price:</strong>
-                        <span class="fw-bold text-danger">${{ $room->price_per_night ?? 100 }} / Night</span>
+                        <span class="fw-bold text-danger">
+                            ${{ $room->fare }} / Night
+                        </span>
                     </p>
 
-                    <div class="mt-3">
+
+                    <div class="mt-1">
                         <a href="route('frontend.room.details', $room->id) " class="btn btn-outline-success btn-sm">
                             <i class="fas fa-info-circle"></i> View Details
-                        </a>
+                        </a> <br> <br>
                         <!-- Book Now বাটন আপডেট -->
                         <a href="{{ route('payment.book.form', ['room_id' => $room->id]) }}" class="btn btn-primary btn-sm">
                             <i class="fas fa-calendar-check"></i> Book Now

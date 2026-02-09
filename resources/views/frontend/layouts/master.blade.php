@@ -40,7 +40,7 @@
                                                         <i class="fas fa-user"></i> {{ auth()->user()->name }}
                                                     </a>
                                                     <ul>													
-                                                        <li><a href="#">Dashboard</a></li>
+                                                        <li><a href="{{ route('dashboard') }}">Dashboard</a></li>
                                                         <li><a href="#">My Bookings</a></li>
                                                         <li><a href="#">Profile</a></li>
                                                         <li>
@@ -269,6 +269,42 @@
         updateAuthButtons();
     });
 
+
+    function toggleGuestBox() {
+    var box = document.getElementById("guest-picker-dropdown");
+    box.style.display = (box.style.display === "none") ? "block" : "none";
+}
+
+function updateCount(type, change) {
+    let countSpan = document.getElementById(type + '-count');
+    let hiddenInput = document.getElementById('hidden-' + (type === 'adult' ? 'adults' : 'children'));
+    let currentCount = parseInt(countSpan.innerText);
+    
+    let newCount = currentCount + change;
+
+    // লজিক: এডাল্ট কমপক্ষে ১ জন হতে হবে এবং বাচ্চা ০ হতে পারবে
+    if (type === 'adult' && newCount < 1) return;
+    if (type === 'child' && newCount < 0) return;
+
+    countSpan.innerText = newCount;
+    hiddenInput.value = newCount;
+
+    // সামারি টেক্সট আপডেট
+    updateSummary();
+}
+
+function updateSummary() {
+    let adults = document.getElementById('adult-count').innerText;
+    let children = document.getElementById('child-count').innerText;
+    document.getElementById('summary-text').innerText = adults + " Adult, " + children + " Child";
+}
+
+// বক্সের বাইরে ক্লিক করলে যাতে বক্স বন্ধ হয়ে যায়
+window.onclick = function(event) {
+    if (!event.target.closest('#guest-input-display') && !event.target.closest('#guest-picker-dropdown')) {
+        document.getElementById("guest-picker-dropdown").style.display = "none";
+    }
+}
         </script>
     </body>
 </html>

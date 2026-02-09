@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Room;
 use App\Models\RoomNo;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -53,63 +54,50 @@ class BookingController extends Controller
     /**
      * Store a new booking
      */
-    public function store(Request $request)
-    {
-        // Validation
-        $request->validate([
-            'room_nos_id' => 'required|exists:room_nos,id',
-            'guest_name' => 'required|string|max:255',
-            'guest_email' => 'nullable|email|max:255',
-            'check_in' => 'required|date',
-            'check_out' => 'required|date|after:check_in',
-            'rooms_id' => 'required|exists:rooms,id',
-        ]);
+   public function store(Request $request)
+{
+    $request->validate([
+        'room_nos_id' => 'required|exists:room_nos,id',
+        'guest_name'  => 'required|string|max:255',
+        'guest_email' => 'required|email',
+        'phone'       => 'required',
+        'check_in'    => 'required|date',
+        'check_out'   => 'required|date|after:check_in',
+        'rooms_id'    => 'required|exists:rooms,id',
+    ]);
 
-        // Calculate nights
-        $checkIn = Carbon::parse($request->check_in);
-        $checkOut = Carbon::parse($request->check_out);
-        $nights = $checkIn->diffInDays($checkOut);
+    // 1️⃣ Calculate nights
+    $nights = Carbon::parse($request->check_in)
+        ->diffInDays(Carbon::parse($request->check_out));
 
-        // Get room fare
-        $room = Room::find($request->rooms_id);
-        $totalPrice = $room ? $room->fare * $nights : 0;
+    $room = Room::find($request->rooms_id);
+    $totalPrice = $room->fare * $nights;
 
-        // Check availability
-        $isBooked = Booking::where('room_nos_id', $request->room_nos_id)
-            ->where(function($query) use ($request) {
-                $query->whereBetween('check_in', [$request->check_in, $request->check_out])
-                      ->orWhereBetween('check_out', [$request->check_in, $request->check_out])
-                      ->orWhere(function($q) use ($request) {
-                          $q->where('check_in', '<', $request->check_in)
-                            ->where('check_out', '>', $request->check_out);
-                      });
-            })
-            ->whereIn('status', ['booked', 'confirmed', 'pending'])
-            ->exists();
+    // 2️⃣ Create booking FIRST
+    $booking = Booking::create([
+        'rooms_id'    => $request->rooms_id,
+        'room_nos_id' => $request->room_nos_id,
+        'guest_name'  => $request->guest_name,
+        'guest_email' => $request->guest_email,
+        'phone'       => $request->phone,
+        'check_in'    => $request->check_in,
+        'check_out'   => $request->check_out,
+        'nights'      => $nights,
+        'total_price'=> $totalPrice,
+        'status'      => 'pending',
+        'is_verified' => false,
+    ]);
 
-        if ($isBooked) {
-            return redirect()->back()
-                ->with('error', 'This room is already booked for the selected dates!')
-                ->withInput();
-        }
+    // 3️⃣ Find or create user
+    $user = User::firstOrCreate(
+        ['email' => $request->guest_email],
+        [
+            'name'  => $request->guest_name,
+            'phone' => $request->phone,
+        ]
+    );
 
-        // Create booking
-        $booking = Booking::create([
-            'rooms_id' => $request->rooms_id,
-            'room_nos_id' => $request->room_nos_id,
-            'guest_name' => $request->guest_name,
-            'guest_email' => $request->guest_email,
-            'check_in' => $request->check_in,
-            'check_out' => $request->check_out,
-            'nights' => $nights,
-            'total_price' => $totalPrice,
-            'status' => 'booked',
-        ]);
-
-        // Success page এ Redirect
-        return redirect()->route('booking.success', $booking->id)
-            ->with('success', 'Booking successful! Booking ID: ' . $booking->id);
-    }
+}
 
     /**
      * Show success page after booking
@@ -171,9 +159,7 @@ class BookingController extends Controller
             ->with('success', 'Booking updated successfully!');
     }
 
-    /**
-     * Remove the specified booking
-     */
+    
     public function destroy($id)
     {
         $booking = Booking::findOrFail($id);
@@ -182,4 +168,46 @@ class BookingController extends Controller
         return redirect()->route('booking.index')
             ->with('success', 'Booking deleted successfully!');
     }
+
+    public function toggleStatus(Request $request)
+{
+    $booking = Booking::findOrFail($request->id);
+
+    if ($booking->status == 'pending') {
+        $booking->status = 'confirmed';
+    } else {
+        $booking->status = 'pending';
+    }
+
+    $booking->save();
+
+    return response()->json([
+        'success' => true,
+        'badge_text' => ucfirst($booking->status),
+        'badge_class' => $booking->status == 'confirmed'
+            ? 'bg-success'
+            : 'bg-warning text-dark',
+        'next_action' => $booking->status == 'pending'
+            ? 'Approve'
+            : 'Pending',
+    ]);
+}
+
+
+public function cancel(Request $request)
+{
+    $booking = Booking::findOrFail($request->id);
+    $booking->status = 'cancelled';
+    $booking->save();
+
+    return response()->json(['success' => true]);
+}
+public function show($id)
+{
+    $booking = Booking::findOrFail($id);
+    return view('frontend.dashboard.booking-details', compact('booking'));
+}
+
+
+
 }

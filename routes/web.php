@@ -6,9 +6,11 @@ use App\Http\Controllers\BedController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FacilitieController;
 use App\Http\Controllers\FrontendController;
 use App\Http\Controllers\ManagerController;
+use App\Http\Controllers\OtpController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -32,6 +34,27 @@ Route::get('/dashboard', function () {
     return view('backend.dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+   Route::get('/my-bookings', [DashboardController::class, 'bookings'])->name('user.bookings');
+   Route::get('/booking/{id}', [DashboardController::class, 'bookingDetails'])->name('user.booking.details');
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+    // Cancel Booking
+    Route::delete('/booking/{id}/cancel', function($id) {
+        $booking = \App\Models\Booking::where('id', $id)
+                    ->where('user_id', auth()->id())
+                    ->firstOrFail();
+                    
+        $booking->update(['status' => 'cancelled']);
+        
+        return redirect()->route('user.bookings')
+               ->with('success', 'Booking cancelled successfully.');
+    })->name('user.booking.cancel');
+      
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -71,6 +94,12 @@ Route::middleware('auth:manager')->prefix('manager')->group(function () {
 Route::post('/amenitie/status-toggle', [AmenitieController::class, 'statusToggle'])->name('amenitie.status.toggle');
 Route::post('/bed/status-toggle', [BedController::class, 'statusToggle'])->name('bed.status.toggle');
 Route::post('/room/status-toggle', [RoomController::class, 'statusToggle'])->name('room.status.toggle');
+Route::post('/booking/toggle-status', [BookingController::class,'toggleStatus'])
+    ->name('booking.toggle.status');
+
+Route::post('/booking/cancel', [BookingController::class,'cancel'])
+    ->name('booking.cancel');
+
 
 // Room Number Management
 Route::delete('/room-no/delete/{id}', [RoomNoController::class, 'destroy'])->name('room_no.destroy');
@@ -79,13 +108,27 @@ Route::post('/room-no/store', [RoomNoController::class, 'store'])->name('room_no
 Route::get('/room-details/{room_id}', [RoomNoController::class, 'index'])->name('room_no.index');
 
 // Frontend
-Route::get('/about', function () { return view('frontend.about'); });
-Route::get('/pages/home', function () { return view('frontend.pages.home'); });
+Route::get('/about', function () {
+    return view('frontend.about');
+});
 
 /* * ==========================================
  * BOOKING SYSTEM ROUTES (Updated)
  * ==========================================
  */
+
+
+//otp
+
+Route::get('/verify-otp/{booking}', [OtpController::class, 'form'])
+    ->name('otp.verify.form');
+    
+Route::post('/verify-otp', [OtpController::class, 'verify'])
+    ->name('otp.verify');
+    
+Route::post('/resend-otp/{id}', [OtpController::class, 'resend'])
+    ->name('otp.resend');
+
 
 // 1. Search Logic (Uses BookController)
 Route::get('/book', [BookController::class, 'index'])->name('book.index');
@@ -102,21 +145,18 @@ Route::get('/admin/dashboard', [AdminController::class, 'Admindashboard'])->name
 Route::get('/manager/dashboard', [ManagerController::class, 'ManagerDashboard'])->name('manager.dashboard');
 
 
-//booking controller er route
-Route::post('/booking', [BookingController::class, 'store'])->name('booking.store');
+// Booking success / view details route
 Route::get('/booking-success/{id}', [BookingController::class, 'success'])->name('booking.success');
+
 Route::get('/booking', [BookingController::class, 'index'])->name('booking.index');
-// routes/web.php
+
 Route::resource('booking', BookingController::class)->except(['create', 'store']);
-// create এবং store ইতিমধ্যে আছে
 
 
 
 
-// User Dashboard রাউট
-Route::get('/user/dashboard', [UserController::class, 'dashboard'])->name('user.dashboard');
-Route::get('/my-bookings', [UserController::class, 'myBookings'])->name('user.bookings');
-// ... ইত্যাদি
+
+
 require __DIR__ . '/auth.php';
 
 Route::get('/', [FrontendController::class, 'index'])->name('home');
@@ -126,35 +166,24 @@ Route::get('/about', [FrontendController::class, 'about'])->name('frontend.about
 Route::get('/contact', [FrontendController::class, 'contact'])->name('frontend.contact');
 Route::get('/check-availability', [FrontendController::class, 'checkAvailability'])->name('frontend.check.availability'); // এই লাইন
 
-// User routes
+
+// Payment / Offline Booking
+Route::get('/payment/book', [PaymentController::class, 'bookForm'])->name('payment.book.form');
+Route::post('/payment/process', [PaymentController::class, 'processBooking'])->name('payment.process');
+Route::get('/booking/offline/success/{id}', [PaymentController::class, 'offlineSuccess'])->name('payment.offline.success');
+Route::get('/booking/bank-transfer/{id}', [PaymentController::class, 'bankTransfer'])->name('payment.bank');
+Route::post('/booking/upload-receipt/{id}', [PaymentController::class, 'uploadReceipt'])->name('payment.upload.receipt');
+Route::get('/booking/success/{id}', [PaymentController::class, 'success'])->name('payment.success');
+Route::get('/booking/fail', [PaymentController::class, 'fail'])->name('payment.fail');
+Route::get('/booking/cancel', [PaymentController::class, 'cancel'])->name('payment.cancel');
+Route::get('/booking/retry/{id}', [PaymentController::class, 'retryPayment'])->name('payment.retry');
+
+
 Route::middleware(['auth'])->group(function () {
-    Route::get('/user/dashboard', [UserController::class, 'dashboard'])->name('user.dashboard');
+    Route::get('/my-bookings', [UserController::class, 'myBookings'])->name('user.bookings');
+
+    Route::get('/booking/cancel/{id}', [UserController::class, 'cancelBooking'])->name('user.bookings.cancel');
+    Route::get('/payment/invoice/{id}', [PaymentController::class, 'invoice'])->name('payment.invoice');
 
 });
 
-
-// Payment রাউটগুলো
-// routes/web.php
-Route::prefix('payment')->group(function () {
-    // বুকিং ফর্ম
-    Route::get('/book', [PaymentController::class, 'bookForm'])->name('payment.book.form');
-    
-    // বুকিং প্রসেস
-    Route::post('/process', [PaymentController::class, 'processBooking'])->name('payment.process');
-    
-    // SSL Commerz কলব্যাক
-    Route::post('/ssl/success', [PaymentController::class, 'sslSuccess'])->name('payment.ssl.success');
-    Route::post('/ssl/fail', [PaymentController::class, 'sslFail'])->name('payment.ssl.fail');
-    Route::post('/ssl/cancel', [PaymentController::class, 'sslCancel'])->name('payment.ssl.cancel');
-    Route::post('/ssl/ipn', [PaymentController::class, 'sslIPN'])->name('payment.ssl.ipn');
-    
-    // স্ট্যাটাস পেজ
-    Route::get('/success/{id}', [PaymentController::class, 'success'])->name('payment.success');
-    Route::get('/fail', [PaymentController::class, 'fail'])->name('payment.fail');
-    Route::get('/cancel', [PaymentController::class, 'cancel'])->name('payment.cancel');
-    Route::get('/bank/{id}', [PaymentController::class, 'bankTransfer'])->name('payment.bank');
-});
-
-// routes/web.php
-Route::post('/payment/upload-receipt', [PaymentController::class, 'uploadReceipt'])->name('payment.upload.receipt');
-Route::get('/payment/retry/{id}', [PaymentController::class, 'retryPayment'])->name('payment.retry');

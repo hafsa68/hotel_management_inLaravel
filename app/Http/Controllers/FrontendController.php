@@ -24,8 +24,7 @@ class FrontendController extends Controller
         // ✅ পরিবর্তন করুন: 'active' থেকে 'Enabled'
         $roomTypes = Room::where('status', 'Enabled')->get();
         
-        // ডিবাগিং জন্য (সাময়িকভাবে)
-        // dd($roomTypes); // ডেটা দেখুন
+        
         
         return view('frontend.rooms', compact('roomTypes'));
     }
@@ -33,7 +32,7 @@ class FrontendController extends Controller
     // রুম ডিটেইলস
     public function roomDetails($id)
     {
-        $room = Room::with('roomNos')->findOrFail($id);
+       $room = Room::with('roomNumbers')->findOrFail($id);
         return view('frontend.room-details', compact('room'));
     }
 
@@ -82,69 +81,80 @@ class FrontendController extends Controller
     }
 
     // রুম বুকিং (লগইন রিকোয়ার্ড)
-    public function bookRoom(Request $request)
-    {
-        // লগইন চেক
-        if (!auth()->check()) {
-            return redirect()->route('user.login')
-                ->with('error', 'Please login to book a room.');
-        }
-
-        $request->validate([
-            'room_id' => 'required|exists:rooms,id',
-            'room_no_id' => 'required|exists:room_nos,id',
-            'check_in' => 'required|date',
-            'check_out' => 'required|date|after:check_in',
-            'guest_name' => 'required|string|max:255',
-            'guest_email' => 'required|email|max:255',
-            'phone' => 'required|string|max:20',
-        ]);
-
-        // এভেলিবিলিটি ডাবল চেক
-        $isAvailable = !Booking::where('room_nos_id', $request->room_no_id)
-            ->where(function($query) use ($request) {
-                $query->whereBetween('check_in', [$request->check_in, $request->check_out])
-                      ->orWhereBetween('check_out', [$request->check_in, $request->check_out])
-                      ->orWhere(function($sub) use ($request) {
-                          $sub->where('check_in', '<', $request->check_in)
-                              ->where('check_out', '>', $request->check_out);
-                      });
-            })
-            ->whereIn('status', ['booked', 'confirmed'])
-            ->exists();
-
-        if (!$isAvailable) {
-            return redirect()->back()
-                ->with('error', 'Sorry, this room is no longer available for the selected dates!')
-                ->withInput();
-        }
-
-        // ক্যালকুলেশন
-        $checkIn = Carbon::parse($request->check_in);
-        $checkOut = Carbon::parse($request->check_out);
-        $nights = $checkIn->diffInDays($checkOut);
-        
-        $room = Room::find($request->room_id);
-        $totalPrice = $room->fare * $nights;
-
-        // বুকিং তৈরি (user_id সহ)
-        $booking = Booking::create([
-            'rooms_id' => $request->room_id,
-            'room_nos_id' => $request->room_no_id,
-            'guest_name' => $request->guest_name,
-            'guest_email' => $request->guest_email,
-            'phone' => $request->phone,
-            'check_in' => $request->check_in,
-            'check_out' => $request->check_out,
-            'nights' => $nights,
-            'total_price' => $totalPrice,
-            'status' => 'booked',
-            'source' => 'website',
-            'user_id' => auth()->id(), // ✅ লগইন ইউজারের ID
-        ]);
-
-        return redirect()->route('frontend.booking.success', $booking->id);
+   public function bookRoom(Request $request)
+{
+    // লগইন চেক
+    if (!auth()->check()) {
+        return redirect()->route('user.login')
+            ->with('error', 'Please login to book a room.');
     }
+
+    $request->validate([
+        'room_id' => 'required|exists:rooms,id',
+        'check_in' => 'required|date',
+        'check_out' => 'required|date|after:check_in',
+        'guest_name' => 'required|string|max:255',
+        'guest_email' => 'required|email|max:255',
+        'phone' => 'required|string|max:20',
+        'rooms' => 'required|integer|min:1',
+    ]);
+
+    // এভেলিবিলিটি চেক
+    $isAvailable = !Booking::where('room_nos_id', $request->room_no_id)
+        ->where(function($query) use ($request) {
+            $query->whereBetween('check_in', [$request->check_in, $request->check_out])
+                  ->orWhereBetween('check_out', [$request->check_in, $request->check_out])
+                  ->orWhere(function($sub) use ($request) {
+                      $sub->where('check_in', '<', $request->check_in)
+                          ->where('check_out', '>', $request->check_out);
+                  });
+        })
+        ->whereIn('status', ['booked', 'confirmed'])
+        ->exists();
+
+    if (!$isAvailable) {
+        return redirect()->back()
+            ->with('error', 'Sorry, this room is no longer available for the selected dates!')
+            ->withInput();
+    }
+
+    // রুম এবং প্রাইস
+    $room = Room::find($request->room_id);
+    $roomPrice = ($room->offer_fare && $room->offer_fare < $room->fare) 
+                    ? $room->offer_fare 
+                    : $room->fare;
+
+    // ক্যালকুলেশন
+    $checkIn = Carbon::parse($request->check_in);
+    $checkOut = Carbon::parse($request->check_out);
+    $nights = $checkIn->diffInDays($checkOut);
+
+    $totalPrice = $roomPrice * $nights * $request->rooms;
+    $serviceCharge = 10; // fixed
+    $vat = $totalPrice * 0.15;
+    $grandTotal = $totalPrice + $vat + $serviceCharge;
+
+    // বুকিং তৈরি
+    $booking = Booking::create([
+        'rooms_id' => $request->room_id,
+        'room_nos_id' => $request->room_no_id,
+        'guest_name' => $request->guest_name,
+        'guest_email' => $request->guest_email,
+        'phone' => $request->phone,
+        'check_in' => $request->check_in,
+        'check_out' => $request->check_out,
+        'nights' => $nights,
+        'rooms' => $request->rooms,
+        'total_price' => $grandTotal,
+        'status' => 'booked',
+        'source' => 'website',
+        'user_id' => auth()->id(),
+    ]);
+
+    return redirect()->route('frontend.booking.success', $booking->id)
+                     ->with('success', 'Your booking has been successfully created!');
+}
+
 
     // বুকিং সাকসেস
     public function bookingSuccess($id)

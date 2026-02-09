@@ -19,6 +19,11 @@ return new class extends Migration
             $table->string('password');
             $table->enum('role',['admin','manager','user'])->default('user');
             $table->enum('status',['active','inactive'])->default('active');
+            $table->string('phone')->nullable()->unique();
+            $table->string('otp')->nullable();
+            $table->timestamp('otp_expires_at')->nullable();
+            $table->timestamp('last_login_at')->nullable();
+            $table->enum('login_type', ['password', 'otp'])->default('otp');
             $table->rememberToken();
             $table->timestamps();
         });

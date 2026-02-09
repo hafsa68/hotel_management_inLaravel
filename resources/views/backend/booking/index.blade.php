@@ -1,6 +1,7 @@
 @extends("backend.layouts.app")
 
 @section('head')
+
 <head>
     <meta charset="utf-8" />
     <title>Dashboard | Dashtrap - Responsive Bootstrap 5 Admin Dashboard</title>
@@ -123,36 +124,44 @@
                             <td>{{ date('d M, Y', strtotime($item->check_in)) }}</td>
                             <td>{{ date('d M, Y', strtotime($item->check_out)) }}</td>
                             <td class="text-center">{{ $item->nights }}</td>
-                            <td class="text-right">৳{{ number_format($item->total_price, 2) }}</td>
+                            <td class="text-right">${{ number_format($item->total_price, 2) }}</td>
                             <td>
-    @php
-        $statusConfig = [
-            'booked' => ['bg-success', 'Booked'],
-            'confirmed' => ['bg-primary', 'Confirmed'],
-            'pending' => ['bg-warning text-dark', 'Pending'],
-            'cancelled' => ['bg-danger', 'Cancelled'],
-            'completed' => ['bg-info', 'Completed']
-        ];
-        
-        $config = $statusConfig[$item->status] ?? ['bg-secondary', 'Unknown'];
-        $class = $config[0];
-        $text = $config[1];
-    @endphp
-    
-    <span class="badge {{ $class }}" style="
-        padding: 5px 10px;
-        border-radius: 4px;
-        font-weight: 500;
-        font-size: 13px;
-        opacity: 1;
-        visibility: visible;
-        display: inline-block;">
-        {{ $text }}
-    </span>
-</td>
+                                @php
+                                $statusMap = [
+                                'pending' => ['bg-warning text-dark', 'Pending'],
+                                'confirmed' => ['bg-success', 'Confirmed'],
+                                'cancelled' => ['bg-danger', 'Cancelled'],
+                                'completed' => ['bg-info', 'Completed'],
+                                ];
+                                [$class, $text] = $statusMap[$item->status] ?? ['bg-secondary', 'Unknown'];
+                                @endphp
+
+                                <span class="badge status-badge {{ $class }}">
+                                    {{ $text }}
+                                </span>
+                            </td>
+
                             <td>{{ $item->created_at->format('d M, Y') }}</td>
                             <td>
                                 <div class="btn-group" role="group">
+
+                                    {{-- Toggle Pending ↔ Confirmed --}}
+                                    @if(in_array($item->status, ['pending','confirmed']))
+                                    <button
+                                        class="btn btn-sm btn-outline-primary toggle-status"
+                                        data-id="{{ $item->id }}">
+                                        {{ $item->status == 'pending' ? 'Approve' : 'Pending' }}
+                                    </button>
+                                    @endif
+
+                                    {{-- Cancel Button --}}
+                                    @if($item->status != 'cancelled')
+                                    <button
+                                        class="btn btn-sm btn-outline-danger cancel-booking"
+                                        data-id="{{ $item->id }}">
+                                        Cancel
+                                    </button>
+                                    @endif
                                     <a href="{{ route('booking.success', $item->id) }}"
                                         class="btn btn-info btn-sm" title="View Details">
                                         <i class="fa fa-eye"></i>
@@ -171,6 +180,7 @@
                                         </button>
                                     </form>
                                 </div>
+
                             </td>
                         </tr>
                         @empty
@@ -236,5 +246,64 @@
             }
         });
     }
+
+
+
+
+
+    /* TOGGLE STATUS */
+    $(document).on('click', '.toggle-status', function() {
+        let btn = $(this);
+        let id = btn.data('id');
+
+        $.post("{{ route('booking.toggle.status') }}", {
+            _token: "{{ csrf_token() }}",
+            id: id
+        }, function(res) {
+
+            if (!res.success) return alert('Failed');
+
+            // Update badge
+            let badge = btn.closest('tr').find('.status-badge');
+            badge.attr('class', 'badge status-badge ' + res.badge_class);
+            badge.text(res.badge_text);
+
+            // Update button text
+            btn.text(res.next_action);
+
+        });
+    });
+
+
+    /* CANCEL BOOKING */
+    $(document).on('click', '.cancel-booking', function() {
+
+        if (!confirm('Cancel this booking?')) return;
+
+        let btn = $(this);
+        let id = btn.data('id');
+
+        $.post("{{ route('booking.cancel') }}", {
+            _token: "{{ csrf_token() }}",
+            id: id
+        }, function(res) {
+
+            if (!res.success) return alert('Failed');
+
+            let row = btn.closest('tr');
+
+            row.find('.status-badge')
+                .attr('class', 'badge status-badge bg-danger')
+                .text('Cancelled');
+
+            row.find('.toggle-status').remove();
+            btn.remove();
+
+        });
+    });
 </script>
+
+
+
+
 @endsection

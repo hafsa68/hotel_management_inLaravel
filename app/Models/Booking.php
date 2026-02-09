@@ -45,4 +45,10 @@ class Booking extends Model
         'check_out' => 'date',
         'total_price' => 'decimal:2',
     ];
+
+    public function user()
+{
+    return $this->belongsTo(User::class);
+}
+
 }
